@@ -1,58 +1,63 @@
-from flask import Flask, request, redirect
+from flask import Flask, request, redirect, jsonify
 import requests
 import os
 from dotenv import load_dotenv
 
-# Load environment variables
+# Load environment variables from .env file
 load_dotenv()
-CLIENT_ID = os.getenv("DAIKIN_CLIENT_ID")
-CLIENT_SECRET = os.getenv("DAIKIN_CLIENT_SECRET")
-REDIRECT_URI = os.getenv("REDIRECT_URI")
-AUTH_URL = os.getenv("AUTH_URL")
-TOKEN_URL = os.getenv("TOKEN_URL")
-API_BASE_URL = os.getenv("API_BASE_URL")
 
+# Initialize the Flask app
 app = Flask(__name__)
 
-@app.route("/")
-def home():
-    # Redirect to Daikin's authorization URL
-    auth_request_url = (
-        f"https://auth.daikin.com/authorize?response_type=code&client_id=7TVOKEO3Sb41s9qY7ySkmMrK"
-        f"&redirect_uri=https://daikinkaru-aegxadavgcemdedw.northeurope-01.azurewebsites.net/&scope=read"
-    )
-    return redirect(auth_request_url)
+# Get Daikin API URL and API Key from environment variables
+DAIKIN_API_URL = os.getenv("DAIKIN_API_URL")
+DAIKIN_API_KEY = os.getenv("DAIKIN_API_KEY")
 
-@app.route("/callback")
-def callback():
-    # Get the authorization code from the query params
-    code = request.args.get("code")
-    if not code:
-        return "Authorization failed", 400
+# Endpoint to get Daikin device status
+@app.route('/device_status', methods=['GET'])
+def get_device_status():
+    try:
+        # Make a GET request to Daikin API
+        response = requests.get(
+            f"{DAIKIN_API_URL}/status",
+            headers={"Authorization": f"Bearer {DAIKIN_API_KEY}"}
+        )
+        
+        # If the response is successful, return the status
+        if response.status_code == 200:
+            return jsonify(response.json()), 200
+        else:
+            return jsonify({"error": "Failed to fetch device status"}), response.status_code
 
-    # Exchange the authorization code for an access token
-    token_response = requests.post(
-        TOKEN_URL,
-        data={
-            "grant_type": "authorization_code",
-            "code": code,
-            "redirect_uri": REDIRECT_URI,
-            "client_id": CLIENT_ID,
-            "client_secret": CLIENT_SECRET,
-        }
-    )
-    
-    token_data = token_response.json()
-    access_token = token_data.get("access_token")
-    if not access_token:
-        return f"Token exchange failed: {token_data}", 400
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": str(e)}), 500
 
-    # Use the access token to call the API
-    api_response = requests.get(
-        f"{API_BASE_URL}/endpoint",  # Replace with the actual endpoint
-        headers={"Authorization": f"Bearer {access_token}"}
-    )
-    return api_response.json()
+# Endpoint to control Daikin device (e.g., turn on or off)
+@app.route('/control_device', methods=['POST'])
+def control_device():
+    try:
+        # Get the command and device ID from the POST request body
+        data = request.json
+        device_id = data.get("device_id")
+        action = data.get("action")  # Example: "turn_on" or "turn_off"
 
-if __name__ == "__main__":
+        # Make a POST request to Daikin API to control the device
+        payload = {"device_id": device_id, "action": action}
+        response = requests.post(
+            f"{DAIKIN_API_URL}/control",
+            json=payload,
+            headers={"Authorization": f"Bearer {DAIKIN_API_KEY}"}
+        )
+
+        # If the response is successful, return the result
+        if response.status_code == 200:
+            return jsonify({"message": "Device control successful"}), 200
+        else:
+            return jsonify({"error": "Failed to control device"}), response.status_code
+
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": str(e)}), 500
+
+# Run the Flask app
+if __name__ == '__main__':
     app.run(debug=True)
