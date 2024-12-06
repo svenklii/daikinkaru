@@ -18,8 +18,8 @@ app = Flask(__name__)
 def home():
     # Redirect to Daikin's authorization URL
     auth_request_url = (
-        f"{AUTH_URL}?response_type=code&client_id=1JwXzkO07DM8Mwf4KI4tjs6V"
-        f"&redirect_uri=urn:ietf:wg:oauth:2.0:oob&scope=read"
+        f"https://auth.daikin.com/authorize?response_type=code&client_id=7TVOKEO3Sb41s9qY7ySkmMrK"
+        f"&redirect_uri=https://daikinkaru-aegxadavgcemdedw.northeurope-01.azurewebsites.net/&scope=read"
     )
     return redirect(auth_request_url)
 
